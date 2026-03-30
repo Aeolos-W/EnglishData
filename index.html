@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>考研英语数据库</title>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js""https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js""https://cdn.jsdelivr.net/npm/marked/marked.min.js""https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
     <script src="https://unpkg.com/file-saver@2.0.5/dist/FileSaver.min.js"></script>
     <style>
@@ -1459,52 +1459,83 @@
 
                 // 高亮关键词并滚动到视野
                 // 高亮关键词并滚动到视野
+        // 高亮关键词并滚动到视野
     function highlightInContent(query) {
         const body = document.getElementById('markdownBody');
         if (!body || !query) return;
         
         // 分割多关键词
         const keywords = query.split(/\s+/).filter(k => k.length > 0);
+        if (keywords.length === 0) return;
+        
         let firstHighlight = null;
         
-        // 遍历所有文本节点，对每个关键词高亮
+        // 构建匹配所有关键词的正则表达式（不区分大小写）
+        const pattern = keywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+        const regex = new RegExp(`(${pattern})`, 'gi');
+        
         const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null, false);
         const nodesToReplace = [];
         let node;
         
+        // 收集所有包含关键词的文本节点
         while (node = walker.nextNode()) {
-            // 只要包含任意关键词就处理
-            if (keywords.some(k => node.nodeValue.toLowerCase().includes(k.toLowerCase()))) {
+            if (regex.test(node.nodeValue)) {
                 nodesToReplace.push(node);
             }
+            // 重置正则 lastIndex，避免 test 后无法再次匹配
+            regex.lastIndex = 0;
         }
         
         nodesToReplace.forEach(node => {
-            let html = node.nodeValue;
-            // 分别高亮每个关键词
-            // 确保正则使用 'gi'（已存在，请确认）
-            keywords.forEach(keyword => {
-            const regex = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-            html = html.replace(regex, match => `<span class="highlight">${match}</span>`);
-            });
+            const parent = node.parentNode;
+            const text = node.nodeValue;
+            const fragments = [];
             
-            const wrapper = document.createElement('span');
-            wrapper.innerHTML = html;
+            let lastIndex = 0;
+            let match;
             
-            // 记录第一个高亮用于滚动
-            if (!firstHighlight) {
-                firstHighlight = wrapper.querySelector('.highlight');
+            // 重置正则
+            regex.lastIndex = 0;
+            
+            // 遍历所有匹配项，安全地构建 DOM 片段
+            while ((match = regex.exec(text)) !== null) {
+                // 添加匹配前的普通文本
+                if (match.index > lastIndex) {
+                    fragments.push(document.createTextNode(text.slice(lastIndex, match.index)));
+                }
+                
+                // 创建高亮 span（使用 textContent 避免 HTML 注入）
+                const span = document.createElement('span');
+                span.className = 'highlight';
+                span.textContent = match[0];
+                fragments.push(span);
+                
+                // 记录第一个高亮元素用于滚动
+                if (!firstHighlight) {
+                    firstHighlight = span;
+                }
+                
+                lastIndex = match.index + match[0].length;
             }
             
-            node.parentNode.replaceChild(wrapper, node);
+            // 添加剩余文本
+            if (lastIndex < text.length) {
+                fragments.push(document.createTextNode(text.slice(lastIndex)));
+            }
+            
+            // 替换原节点（使用安全的 DOM 操作，而非 innerHTML）
+            fragments.forEach(frag => parent.insertBefore(frag, node));
+            parent.removeChild(node);
         });
         
-        // 滚动到第一个高亮
+        // 滚动到第一个高亮位置
         if (firstHighlight) {
-            firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => {
+                firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
         }
     }
-
     // 导出检索结果为 MD 或 DOCX
 async function exportResults(format) {
     const query = window.currentSearchQuery || document.getElementById('searchInput').value.trim();
