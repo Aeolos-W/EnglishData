@@ -1,0 +1,1688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>古籍文献检索系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+    <script src="https://unpkg.com/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --ink-black: #2c2c2c;
+            --paper-bg: #f7f3e9;
+            --accent: #8b4513;
+            --border: #d4c4b0;
+            --hover: #e8dfcf;
+        }
+
+        body {
+            font-family: "Noto Serif SC", "Source Han Serif SC", "SimSun", serif;
+            background-color: var(--paper-bg);
+            color: var(--ink-black);
+            line-height: 1.8;
+            min-height: 100vh;
+        }
+
+        /* 首页样式 - 极简风格 */
+        .home-page {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+            background: linear-gradient(to bottom, #f7f3e9 0%, #ede5d5 100%);
+        }
+
+        .brand {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 3rem;
+            color: var(--ink-black);
+            letter-spacing: 0.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .search-container {
+            width: 100%;
+            max-width: 600px;
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border: 1px solid var(--border);
+        }
+
+        .search-tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 0.8rem;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 1rem;
+            font-family: inherit;
+            color: #666;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .tab-btn.active {
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--accent);
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+        }
+
+        #searchInput {
+            flex: 1;
+            padding: 1rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 1.1rem;
+            font-family: inherit;
+            background: var(--paper-bg);
+            transition: border-color 0.3s;
+        }
+
+        #searchInput:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        #searchBtn {
+            padding: 1rem 2rem;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: background 0.3s;
+        }
+
+        #searchBtn:hover {
+            background: #6b3410;
+        }
+
+        /* 搜索结果页 */
+        .results-page {
+            display: none;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .back-btn {
+            padding: 0.5rem 1rem;
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            color: var(--accent);
+            transition: all 0.3s;
+        }
+
+        .back-btn:hover {
+            background: var(--hover);
+        }
+
+        .book-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .book-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .book-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--accent);
+            transform: scaleX(0);
+            transition: transform 0.3s;
+        }
+
+        .book-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+
+        .book-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .book-title {
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            color: var(--ink-black);
+        }
+
+        .book-meta {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 1rem;
+        }
+
+        .book-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 1rem;
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid var(--border);
+            background: var(--paper-bg);
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .action-btn:hover {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        /* 阅读页面 */
+        .reader-page {
+            display: none;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .reader-layout {
+            display: flex;
+            height: 100%;
+        }
+
+        /* 目录侧边栏 */
+        .toc-sidebar {
+            width: 280px;
+            background: #fcfaf5;
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            padding: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .toc-header {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--accent);
+            color: var(--accent);
+        }
+
+        .toc-list {
+            list-style: none;
+        }
+
+        .toc-item {
+            margin: 0.5rem 0;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 4px;
+            transition: background 0.2s;
+            font-size: 0.95rem;
+        }
+
+        .toc-item:hover {
+            background: var(--hover);
+        }
+
+        .toc-item.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        .toc-level-1 {
+            font-weight: bold;
+            color: var(--accent);
+            margin-top: 1rem;
+            border-left: 3px solid var(--accent);
+            padding-left: 0.8rem;
+        }
+
+        .toc-level-2 {
+            padding-left: 1.5rem;
+            font-size: 0.9rem;
+            border-left: 2px solid var(--border);
+            margin-left: 0.3rem;
+        }
+
+        /* 内容区域 */
+        .content-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .reader-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 2rem;
+            background: white;
+            border-bottom: 1px solid var(--border);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .reader-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .reader-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .control-btn {
+            padding: 0.4rem 1rem;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .control-btn:hover {
+            background: var(--hover);
+        }
+
+        .reader-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 3rem 4rem;
+            background: var(--paper-bg);
+        }
+
+        .markdown-body {
+            max-width: 800px;
+            margin: 0 auto;
+            font-size: 1.1rem;
+            line-height: 2;
+        }
+
+        .markdown-body h1 {
+            font-size: 2rem;
+            margin: 2rem 0 1.5rem;
+            color: var(--accent);
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 0.5rem;
+        }
+
+        .markdown-body h2 {
+            font-size: 1.5rem;
+            margin: 1.8rem 0 1.2rem;
+            color: var(--ink-black);
+        }
+
+        .markdown-body h3, .markdown-body h4 {
+            font-size: 1.2rem;
+            margin: 1.5rem 0 1rem;
+            color: #444;
+        }
+
+        .markdown-body p {
+            margin: 1rem 0;
+            text-align: justify;
+            text-indent: 2em;
+        }
+
+        .markdown-body img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 2rem auto;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .markdown-body strong {
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        .markdown-body blockquote {
+            margin: 1.5rem 0;
+            padding: 1rem 1.5rem;
+            border-left: 4px solid var(--accent);
+            background: white;
+            font-style: italic;
+        }
+
+        /* 高亮搜索结果 */
+        .highlight {
+            color: #8b4513;       /* 棕红色字体 */
+            font-weight: bold;    /* 加粗 */
+            font-family: "SimHei", "Heiti SC", "Noto Sans SC", sans-serif; /* 黑体 */
+            background: transparent; /* 去除黄色背景 */
+            padding: 0 2px;
+            border-radius: 2px;
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .toc-sidebar {
+                position: fixed;
+                left: -280px;
+                top: 0;
+                bottom: 0;
+                z-index: 100;
+                transition: left 0.3s;
+                box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+            }
+
+            .toc-sidebar.open {
+                left: 0;
+            }
+
+            .reader-content {
+                padding: 2rem;
+            }
+
+            .brand {
+                font-size: 2rem;
+            }
+        }
+
+        /* 加载动画 */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem;
+            color: #999;
+            font-size: 1.1rem;
+        }
+
+        /* 搜索结果列表（全文检索） */
+        .search-result-item {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .search-result-item:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .result-context {
+            margin-top: 0.8rem;
+            color: #555;
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        .result-meta {
+            font-size: 0.85rem;
+            color: #888;
+            margin-top: 0.5rem;
+        }
+
+                /* 书内全文检索 */
+                .in-book-search-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-right: 15px;
+        }
+        
+        #inBookSearchInput {
+            padding: 0.3rem 0.8rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-family: inherit;
+            width: 200px;
+            font-size: 0.9rem;
+        }
+        
+        .search-results-panel {
+            position: absolute;
+            top: 60px;
+            right: 20px;
+            width: 400px;
+            max-height: 500px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+            padding: 1rem;
+        }
+        
+        .search-results-panel.show {
+            display: block;
+        }
+        
+        .in-book-result {
+            padding: 0.8rem;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+        
+        .in-book-result:hover {
+            background: var(--hover);
+        }
+        
+        .in-book-result-line {
+            color: #666;
+            font-size: 0.8rem;
+            margin-top: 4px;
+        }
+
+        /* 评论区样式 */
+        .comments-section {
+            max-width: 800px;
+            margin: 3rem auto 0;
+            padding-top: 2rem;
+            border-top: 2px solid var(--border);
+        }
+        
+        .comments-section h3 {
+            color: var(--accent);
+            margin-bottom: 1.5rem;
+            font-size: 1.3rem;
+        }
+        
+        .comments-list {
+            margin-bottom: 2rem;
+        }
+        
+        .comment-item {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .comment-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .comment-author {
+            font-weight: bold;
+            color: var(--accent);
+        }
+        
+        .comment-content {
+            line-height: 1.6;
+            text-indent: 0;
+        }
+        
+        .comment-form {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+        
+        .comment-form input,
+        .comment-form textarea {
+            width: 100%;
+            padding: 0.8rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 1rem;
+        }
+        
+        .comment-form textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        
+        .comment-form button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.8rem 2rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 1rem;
+        }
+        
+        .comment-form button:hover {
+            background: #6b3410;
+        }
+        
+        .no-comments {
+            text-align: center;
+            color: #999;
+            padding: 2rem;
+            font-style: italic;
+        }
+
+                /* 书城页面容器 */
+                .bookstore-page {
+            display: none;  /* 默认隐藏 */
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+
+        /* 书城网格 - 网页端固定3列，如图二布局 */
+        .bookstore-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);  /* 强制3列 */
+            gap: 3rem 2rem;
+            padding: 2rem 4rem;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        /* 书籍封面卡片整体 */
+        .book-cover-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .book-cover-card:hover {
+            transform: translateY(-8px);
+        }
+
+        /* 线装书封面 - 竖版样式 */
+        .book-cover {
+            width: 140px;
+            height: 200px;
+            border-radius: 4px;
+            position: relative;
+            box-shadow: 3px 5px 15px rgba(0,0,0,0.2);
+            /* 右侧装订线效果 */
+            border-right: 3px solid rgba(255,255,255,0.4);
+            overflow: hidden;
+        }
+
+        /* 模拟线装书的装订孔（右侧白点） */
+        .book-cover::after {
+            content: '';
+            position: absolute;
+            right: 8px;
+            top: 20px;
+            bottom: 20px;
+            width: 2px;
+            background: repeating-linear-gradient(
+                to bottom,
+                rgba(255,255,255,0.6) 0px,
+                rgba(255,255,255,0.6) 8px,
+                transparent 8px,
+                transparent 20px
+            );
+        }
+
+        /* 封面标签 - 竖排书名 */
+        .book-cover-label {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            writing-mode: vertical-rl;  /* 竖排从右至左 */
+            text-orientation: upright;
+            font-size: 1.2rem;
+            color: #fff;
+            font-weight: bold;
+            letter-spacing: 0.4em;
+            font-family: "Noto Serif SC", "SimSun", serif;
+            border: 2px solid rgba(255,255,255,0.5);
+            padding: 1rem 0.6rem;
+            border-radius: 4px;
+            background: rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            max-height: 140px;
+            overflow: hidden;
+        }
+
+        /* 图二所示的古籍配色方案 */
+        .cover-brown { background: linear-gradient(135deg, #8b4513, #a0522d); }      /* 伤寒论 - 赭石 */
+        .cover-yellow { background: linear-gradient(135deg, #d2691e, #cd853f); }      /* 内经 - 土黄 */
+        .cover-gold { background: linear-gradient(135deg, #daa520, #b8860b); }        /* 金匮 - 金黄 */
+        .cover-red { background: linear-gradient(135deg, #a52a2a, #8b4513); }         /* 赤水 - 赤红 */
+        .cover-purple { background: linear-gradient(135deg, #8b4789, #6b3a6b); }       /* 临证 - 紫红 */
+        .cover-olive { background: linear-gradient(135deg, #6b8e23, #556b2f); }       /* 本草 - 橄榄绿 */
+        .cover-cyan { background: linear-gradient(135deg, #5f9ea0, #4682b4); }         /* 其他 - 青灰 */
+
+        /* 封面下方信息 */
+        .book-cover-title {
+            margin-top: 1.2rem;
+            font-size: 1.1rem;
+            color: var(--ink-black);
+            text-align: center;
+            font-weight: bold;
+            letter-spacing: 0.1em;
+        }
+
+        .book-cover-meta {
+            font-size: 0.85rem;
+            color: #888;
+            margin-top: 0.3rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 首页：极简搜索 -->
+    <div id="homePage" class="home-page">
+        <h1 class="brand">探骊玄珠</h1>
+        <div class="search-container">
+            <div class="search-tabs">
+                <button class="tab-btn active" data-mode="content">全文检索</button>
+                <button class="tab-btn" data-mode="title">书名检索</button>
+            </div>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="输入关键词，多个词空格隔开（需同时包含）..." autocomplete="off">
+                <button id="searchBtn">检索</button>
+            </div>
+            <div style="margin-top: 1.5rem; text-align: center;">
+                <button onclick="showBookstore()" style="
+                    padding: 0.6rem 2rem;
+                    background: transparent;
+                    border: 1px solid var(--accent);
+                    color: var(--accent);
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-family: inherit;
+                    font-size: 0.95rem;
+                    letter-spacing: 0.2em;
+                    transition: all 0.3s;
+                " onmouseover="this.style.background='var(--accent)';this.style.color='white';" 
+                onmouseout="this.style.background='transparent';this.style.color='var(--accent)';">
+                    浏览全部藏书
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 搜索结果页 -->
+    <div id="resultsPage" class="results-page">
+        <div class="header">
+            <div>
+                <button class="back-btn" onclick="showHome()">← 返回首页</button>
+                <span id="resultsCount" style="margin-left: 1rem; color: #666;"></span>
+            </div>
+            <div style="display:flex;gap:10px;">
+                <button class="control-btn" onclick="exportResults('md')" style="background:var(--accent);color:white;border-color:var(--accent);">📄 导出为 MD</button>
+                <button class="control-btn" onclick="exportResults('docx')" style="background:var(--accent);color:white;border-color:var(--accent);">📘 导出为 Word</button>
+            </div>
+        </div>
+        <div id="resultsContainer" class="book-grid"></div>
+        <div id="loading" class="loading">正在检索古籍...</div>
+        <div id="emptyState" class="empty-state" style="display: none;">
+            未找到相关结果，请尝试其他关键词
+        </div>
+    </div>
+
+    <!-- 书城页面 -->
+    <div id="bookstorePage" class="bookstore-page">
+        <div class="header">
+            <button class="back-btn" onclick="showHome()">← 返回首页</button>
+            <h2 style="color: var(--accent); font-family: inherit; letter-spacing: 0.3em;">藏书阁</h2>
+            <div style="width: 80px;"></div>
+        </div>
+        <div id="bookstoreContainer" class="bookstore-grid">
+            <!-- 书籍封面将动态渲染在这里 -->
+        </div>
+    </div>
+
+    <!-- 阅读页面 -->
+    <div id="readerPage" class="reader-page">
+        <div class="reader-layout">
+            <nav id="tocSidebar" class="toc-sidebar">
+                <div class="toc-header">目录</div>
+                <ul id="tocList" class="toc-list"></ul>
+            </nav>
+            <main class="content-area">
+                <header class="reader-header">
+                    <div class="reader-title" id="readerTitle">书籍标题</div>
+                    <div class="reader-controls">
+                        <div class="in-book-search-box">
+                            <input type="text" id="inBookSearchInput" placeholder="书内全文检索..." onkeypress="if(event.key==='Enter')searchInBook()">
+                            <button class="control-btn" onclick="searchInBook()">书内检索</button>
+                        </div>
+                        <button class="control-btn" onclick="showResults()">返回列表</button>
+                        <button class="control-btn" onclick="showHome()">首页</button>
+                        <button class="control-btn" onclick="toggleToc()">目录</button>
+                    </div>
+                </header>
+                 <!-- 书内搜索结果面板 -->
+                    <div id="searchResultsPanel" class="search-results-panel">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                            <strong>书内搜索结果</strong>
+                            <button onclick="closeSearchPanel()" style="border:none;background:none;cursor:pointer;font-size:1.2rem;">×</button>
+                        </div>
+                        <div id="searchResultsList"></div>
+                    </div>
+                    <article id="readerContent" class="reader-content">
+                        <div id="markdownBody" class="markdown-body"></div>
+                         <!-- 评论区 -->
+                        <div id="commentsSection" class="comments-section" style="display:none;">
+                            <h3>💬 章节评论</h3>
+                            <div id="commentsList" class="comments-list"></div>
+                            <div class="comment-form">
+                                <input type="text" id="commentAuthor" placeholder="您的昵称（可选）" maxlength="20">
+                                <textarea id="commentContent" placeholder="写下您对本章节的见解或疑问..." maxlength="500"></textarea>
+                                <button onclick="submitComment()">发表评论</button>
+                            </div>
+                        </div>
+                </article>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // API基础URL（后端地址）
+        const DATABASE_URL = './database.json';
+
+        // 状态管理
+        let booksDatabase = [];  // 存储从 JSON 加载的所有书籍
+        let currentBooks = [];
+        let currentBook = null;
+        let currentToc = [];
+        let searchMode = 'content';
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            initEventListeners();
+            // 加载数据库
+            loadDatabase();
+
+            async function loadDatabase() {
+                try {
+                    const response = await fetch(DATABASE_URL);
+                    booksDatabase = await response.json();
+                    console.log('古籍数据加载完成，共', booksDatabase.length, '本');
+                } catch (error) {
+                    console.error('加载数据失败:', error);
+                    alert('加载古籍数据库失败，请确保 database.json 与 index.html 在同一目录');
+                }
+            }
+        });
+
+        function initEventListeners() {
+            // 搜索按钮
+            document.getElementById('searchBtn').addEventListener('click', performSearch);
+            document.getElementById('searchInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') performSearch();
+            });
+
+            // 标签切换
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    searchMode = btn.dataset.mode;
+                    const placeholder = searchMode === 'content' ? '输入关键词检索全文...' : '输入书名检索...';
+                    document.getElementById('searchInput').placeholder = placeholder;
+                });
+            });
+        }
+
+    async function performSearch() {
+        const query = document.getElementById('searchInput').value.trim();
+        if (!query) return;
+        
+        if (booksDatabase.length === 0) {
+            alert('数据正在加载中，请稍候...');
+            return;
+        }
+
+        showResultsPage();
+        
+        const loading = document.getElementById('loading');
+        const empty = document.getElementById('emptyState');
+        const container = document.getElementById('resultsContainer');
+        const countEl = document.getElementById('resultsCount');
+        
+        loading.classList.add('show');
+        empty.style.display = 'none';
+        container.innerHTML = '';
+        countEl.textContent = '';
+
+        // 本地搜索（模拟延迟）
+        setTimeout(() => {
+            loading.classList.remove('show');
+            
+            let results = [];
+            const keywords = query.toLowerCase().split(/\s+/).filter(k => k.length > 0);
+            
+            if (searchMode === 'title') {
+                // 书名检索
+                results = booksDatabase.filter(book => 
+                    book.title.includes(query) || 
+                    book.author.includes(query) ||
+                    book.dynasty.includes(query)
+                ).map(book => ({ type: 'book', book: book }));
+            } else {
+                // 全文检索 - 多关键词 AND 匹配（跨行）
+                booksDatabase.forEach(book => {
+                    const contentLower = book.content.toLowerCase();
+                    
+                    // 检查是否包含所有关键词（AND 逻辑）
+                    if (!keywords.every(k => contentLower.includes(k))) return;
+                    
+                    const matches = [];
+                    const lines = book.content.split('\n');
+                    
+                    lines.forEach((line, index) => {
+                        if (line.startsWith('---')) return;
+                        const lineLower = line.toLowerCase();
+                        
+                        // 只要包含任意关键词就展示该行
+                        if (keywords.some(k => lineLower.includes(k))) {
+                            let chapterTitle = '';
+                            for (let i = index; i >= 0; i--) {
+                                if (lines[i].startsWith('## ')) {
+                                    chapterTitle = lines[i].replace('## ', '').trim();
+                                    break;
+                                }
+                            }
+                            matches.push({ 
+                                line: index, 
+                                text: line.trim(),
+                                chapterTitle: chapterTitle 
+                            });
+                        }
+                    });
+                    
+                    if (matches.length > 0) {
+                        results.push({ type: 'content', book: book, matches: matches });
+                    }
+                });
+            }
+
+            if (results.length === 0) {
+                empty.style.display = 'block';
+                return;
+            }
+
+            countEl.textContent = `找到 ${results.length} 个结果`;
+            displayResults(results, query);
+        }, 100);
+    }
+
+        // 显示搜索结果
+        function displayResults(results, query) {
+            window.currentSearchResults = results;  // 添加这行，确保导出时能访问
+            window.currentSearchQuery = query;      // 添加这行
+            const container = document.getElementById('resultsContainer');
+            
+            if (searchMode === 'title') {
+                // 书名检索结果 - 卡片式
+                container.className = 'book-grid';
+                results.forEach(result => {
+                    const book = result.book;
+                    const card = createBookCard(book);
+                    container.appendChild(card);
+                });
+            } else {
+                // 全文检索结果 - 列表式
+                container.className = '';
+                results.forEach(result => {
+                    result.matches.forEach(match => {
+                        const div = document.createElement('div');
+                        div.className = 'search-result-item';
+                        
+                        // 高亮关键词
+                        // 高亮所有关键词（支持空格分隔的多词）
+                        const keywords = query.split(/\s+/).filter(k => k.length > 0);
+                        let highlightedText = match.text;
+                        keywords.forEach(keyword => {
+                            highlightedText = highlightedText.replace(
+                                new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+                                match => `<span class="highlight">${match}</span>`
+                            );
+                        });
+                        
+                            // 组合标题：书名·章节名
+                            const displayTitle = match.chapterTitle 
+                            ? `${result.book.title}·${match.chapterTitle}` 
+                            : result.book.title;
+                            
+                        div.innerHTML = `
+                            <div class="book-title">${displayTitle}</div>
+                            <div class="book-meta">${result.book.dynasty} · ${result.book.author}</div>
+                            <div class="result-context">${highlightedText}</div>
+                            <div class="result-meta">行号: ${match.line} | 点击阅读本章节</div>
+                        `;
+                        
+                        div.onclick = () => openBook(result.book.id, match.line, query);
+                        container.appendChild(div);
+                    });
+                });
+            }
+        }
+
+        // 创建书籍卡片
+        function createBookCard(book) {
+            const card = document.createElement('div');
+            card.className = 'book-card';
+            card.innerHTML = `
+                <div class="book-title">${book.title}</div>
+                <div class="book-meta">${book.dynasty} · ${book.author}</div>
+                <div class="book-actions">
+                    <button class="action-btn" onclick="event.stopPropagation(); openBook('${book.id}')">阅读本书</button>
+                    <button class="action-btn" onclick="event.stopPropagation(); openBook('${book.id}', true)">阅读章节</button>
+                </div>
+            `;
+            card.onclick = () => openBook(book.id);
+            return card;
+        }
+
+        // 打开书籍（从后端获取真实数据）
+        async function openBook(bookId, specificLine = false, highlightQuery = null) {
+            try {
+                showReaderPage();
+                document.getElementById('readerTitle').textContent = '加载中...';
+                
+                // 从本地数据库查找书籍
+                const book = booksDatabase.find(b => b.id === bookId);
+                if (!book) {
+                    alert('书籍未找到');
+                    return;
+                }
+                
+                currentBook = book;
+                currentBook = book;
+                
+                // 解析目录结构
+                parseToc(book.content);
+                
+                // 设置标题
+                document.getElementById('readerTitle').textContent = `${book.title} · ${book.author}`;
+                
+                // 渲染目录
+                renderToc();
+                
+                // 渲染内容
+                if (specificLine && typeof specificLine === 'number') {
+                    // 跳转到特定行附近的内容
+                    const lines = book.content.split('\n');
+                    let chapterStart = specificLine;
+                    while (chapterStart > 0 && !lines[chapterStart].startsWith('#')) {
+                        chapterStart--;
+                    }
+                    const sectionContent = lines.slice(chapterStart, chapterStart + 50).join('\n');
+                    renderContent(sectionContent);
+                    
+                    // 高亮当前章节
+                    setTimeout(() => {
+                        const tocItems = document.querySelectorAll('.toc-item');
+                        tocItems.forEach(item => item.classList.remove('active'));
+                        // 找到最接近的章节
+                        const activeItem = Array.from(tocItems).find(item => {
+                            const line = parseInt(item.dataset.line);
+                            return line <= specificLine && (line + 20) >= specificLine;
+                        });
+                        if (activeItem) activeItem.classList.add('active');
+                    }, 100);
+                } else {
+                    // 渲染全书
+                    renderContent(book.content);
+                }
+                
+                // 高亮并滚动到关键词（移到 try 块内，渲染之后）
+                if (highlightQuery) {
+                    setTimeout(() => {
+                        highlightInContent(highlightQuery);
+                    }, 150);
+                }
+            } catch (error) {
+                console.error('打开书籍失败:', error);
+                alert('打开书籍失败：' + error.message);
+            }
+        }
+
+        // 解析目录结构
+        function parseToc(content) {
+            const lines = content.split('\n');
+            currentToc = [];
+            
+            lines.forEach((line, index) => {
+                if (line.startsWith('# ')) {
+                    // 卷
+                    const title = line.replace('# ', '').trim();
+                    currentToc.push({ type: 'volume', title: title, line: index, level: 1 });
+                } else if (line.startsWith('## ')) {
+                    // 章
+                    const title = line.replace('## ', '').trim();
+                    currentToc.push({ type: 'chapter', title: title, line: index, level: 2 });
+                }
+            });
+        }
+
+        // 渲染目录
+        function renderToc() {
+            const tocList = document.getElementById('tocList');
+            tocList.innerHTML = '';
+            
+            currentToc.forEach((item, index) => {
+                const li = document.createElement('li');
+                li.className = `toc-item toc-level-${item.level}`;
+                li.textContent = item.title;
+                li.dataset.line = item.line;
+                li.onclick = () => jumpToSection(item.line, li);
+                tocList.appendChild(li);
+            });
+        }
+
+        // 跳转到章节
+        function jumpToSection(lineNum, element) {
+            // 更新激活状态
+            document.querySelectorAll('.toc-item').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+            
+            // 获取该部分内容
+            const lines = currentBook.content.split('\n');
+            let endLine = lineNum;
+            
+            // 找到下一个同级或更高级标题
+            for (let i = lineNum + 1; i < lines.length; i++) {
+                if (lines[i].startsWith('# ') || lines[i].startsWith('## ')) {
+                    endLine = i;
+                    break;
+                }
+                endLine = i;
+            }
+            
+            const sectionContent = lines.slice(lineNum, endLine + 1).join('\n');
+            renderContent(sectionContent);
+            
+            // 移动端关闭目录
+            if (window.innerWidth <= 768) {
+                document.getElementById('tocSidebar').classList.remove('open');
+            }
+        }
+
+        // 渲染Markdown内容
+        function renderContent(content) {
+            // 移除Front-matter
+            let cleanContent = content.replace(/---[\s\S]*?---/, '');
+            
+            // 配置marked
+            marked.setOptions({
+                breaks: true,
+                gfm: true,
+                headerIds: true
+            });
+            
+            const html = marked.parse(cleanContent);
+            document.getElementById('markdownBody').innerHTML = html;
+            
+            // 滚动到顶部
+            document.getElementById('readerContent').scrollTop = 0;
+        }
+
+        // 页面切换函数
+        function showHome() {
+            document.getElementById('homePage').style.display = 'flex';
+            document.getElementById('resultsPage').style.display = 'none';
+            document.getElementById('readerPage').style.display = 'none';
+            document.getElementById('bookstorePage').style.display = 'none'; 
+            document.getElementById('searchInput').value = '';
+        }
+
+        function showResultsPage() {
+            document.getElementById('homePage').style.display = 'none';
+            document.getElementById('resultsPage').style.display = 'block';
+            document.getElementById('readerPage').style.display = 'none';
+            document.getElementById('bookstorePage').style.display = 'none';
+        }
+
+        function showResults() {
+            showResultsPage();
+        }
+
+        function showReaderPage() {
+            document.getElementById('homePage').style.display = 'none';
+            document.getElementById('resultsPage').style.display = 'none';
+            document.getElementById('readerPage').style.display = 'block';
+        }
+
+        function toggleToc() {
+            document.getElementById('tocSidebar').classList.toggle('open');
+        }
+
+                // 显示书城
+                function showBookstore() {
+            document.getElementById('homePage').style.display = 'none';
+            document.getElementById('resultsPage').style.display = 'none';
+            document.getElementById('readerPage').style.display = 'none';
+            document.getElementById('bookstorePage').style.display = 'block';
+            
+            renderBookstore();  // 渲染书籍封面
+        }
+
+        // 渲染书城封面网格
+        function renderBookstore() {
+            const container = document.getElementById('bookstoreContainer');
+            if (container.children.length > 0) return; // 已渲染则跳过
+            
+            // 配色循环（对应CSS中的7种颜色类）
+            const colorClasses = ['cover-brown', 'cover-yellow', 'cover-gold', 'cover-red', 'cover-purple', 'cover-olive', 'cover-cyan'];
+            
+            booksDatabase.forEach((book, index) => {
+                const card = document.createElement('div');
+                card.className = 'book-cover-card';
+                card.onclick = () => openBook(book.id);
+                
+                // 根据索引循环分配颜色
+                const colorClass = colorClasses[index % colorClasses.length];
+                // 截取书名为4字以内（美观）
+                const shortTitle = book.title.substring(0, 4);
+                
+                card.innerHTML = `
+                    <div class="book-cover ${colorClass}">
+                        <div class="book-cover-label">${shortTitle}</div>
+                    </div>
+                    <div class="book-cover-title">${book.title}</div>
+                    <div class="book-cover-meta">${book.dynasty} · ${book.author}</div>
+                `;
+                
+                container.appendChild(card);
+            });
+        }
+
+                // 书内全文检索功能
+        function searchInBook() {
+            const query = document.getElementById('inBookSearchInput').value.trim();
+            if (!query || !currentBook) return;
+            
+            const lines = currentBook.content.split('\n');
+            const keywords = query.split(/\s+/).filter(k => k.length > 0);
+            
+            // 关键修改：检查全文是否包含所有关键词（跨行 AND 匹配）
+            const contentLower = currentBook.content.toLowerCase();
+            const hasAllKeywords = keywords.every(k => contentLower.includes(k.toLowerCase()));
+            
+            if (!hasAllKeywords) {
+                displayInBookResults([], query); // 不满足 AND 条件则返回空
+                return;
+            }
+            
+            // 包含所有关键词时，收集包含任意关键词的行
+            const results = [];
+            lines.forEach((line, index) => {
+                if (line.startsWith('---')) return;
+                const lineLower = line.toLowerCase();
+                if (keywords.some(k => lineLower.includes(k))) {
+                    results.push({ line: index, text: line.trim() });
+                }
+            });
+            
+            displayInBookResults(results, query);
+        }
+        
+        function displayInBookResults(results, query) {
+            const panel = document.getElementById('searchResultsPanel');
+            const list = document.getElementById('searchResultsList');
+            
+            if (results.length === 0) {
+                list.innerHTML = '<div style="text-align:center;color:#999;padding:2rem;">未找到相关内容（需同时包含所有关键词）</div>';
+            } else {
+                list.innerHTML = results.map(r => {
+                    // 修改：分别高亮每个关键词
+                    const keywords = query.split(/\s+/).filter(k => k.length > 0);
+                    let highlightedText = r.text;
+                    keywords.forEach(keyword => {
+                        highlightedText = highlightedText.replace(
+                            new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+                            match => `<span class="highlight">${match}</span>`
+                        );
+                    });
+                    
+                    return `
+                        <div class="in-book-result" onclick="jumpToLine(${r.line})">
+                            <div>${highlightedText}</div>
+                            <div class="in-book-result-line">第 ${r.line + 1} 行</div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            panel.classList.add('show');
+        }
+        
+        function closeSearchPanel() {
+            document.getElementById('searchResultsPanel').classList.remove('show');
+        }
+        
+        function jumpToLine(lineNum) {
+            // 找到该行所属的章节并跳转
+            const lines = currentBook.content.split('\n');
+            let chapterStart = lineNum;
+            while (chapterStart > 0 && !lines[chapterStart].startsWith('#')) {
+                chapterStart--;
+            }
+            
+            // 渲染该章节
+            let endLine = lineNum;
+            for (let i = lineNum + 1; i < lines.length; i++) {
+                if (lines[i].startsWith('# ') || lines[i].startsWith('## ')) {
+                    endLine = i;
+                    break;
+                }
+                endLine = i;
+            }
+            
+            const sectionContent = lines.slice(chapterStart, endLine + 1).join('\n');
+            renderContent(sectionContent);
+            
+            // 高亮目标行
+            setTimeout(() => {
+                const body = document.getElementById('markdownBody');
+                const paragraphs = body.getElementsByTagName('p');
+                // 简单高亮包含关键词的第一个段落
+                const targetText = lines[lineNum].replace(/^#+ /, '');
+                for (let p of paragraphs) {
+                    if (p.textContent.includes(targetText.substring(0, 20))) {
+                        p.style.background = '#ffeb3b';
+                        p.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        setTimeout(() => p.style.background = '', 3000);
+                        break;
+                    }
+                }
+            }, 100);
+            
+            closeSearchPanel();
+        }
+
+        // 评论功能（永久保存需要后端支持，这里是前端实现）
+        let currentChapterId = null;
+        
+        // 修改 renderContent 函数以加载评论
+        const originalRenderContent = renderContent;
+        renderContent = function(content) {
+            originalRenderContent(content);
+            
+            // 生成章节ID（基于内容哈希或标题）
+            const lines = content.split('\n');
+            const titleLine = lines.find(l => l.startsWith('#') || l.startsWith('##')) || lines[0];
+            currentChapterId = currentBook.id + '_' + titleLine.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '').substring(0, 20);
+            
+            // 显示评论区
+            document.getElementById('commentsSection').style.display = 'block';
+            loadComments();
+        };
+        
+        function loadComments() {
+            const list = document.getElementById('commentsList');
+            
+            // GitHub Pages 只能用 localStorage 存储
+            const localComments = JSON.parse(localStorage.getItem('comments_' + currentChapterId) || '[]');
+            if (localComments.length > 0) {
+                renderComments(localComments);
+            } else {
+                list.innerHTML = '<div class="no-comments">暂无评论，快来发表第一条评论吧！</div>';
+            }
+        }
+        
+        function renderComments(comments) {
+            const list = document.getElementById('commentsList');
+            list.innerHTML = comments.map(c => `
+                <div class="comment-item">
+                    <div class="comment-header">
+                        <span class="comment-author">${c.author || '匿名读者'}</span>
+                        <span>${new Date(c.time).toLocaleString()}</span>
+                    </div>
+                    <div class="comment-content">${c.content}</div>
+                </div>
+            `).join('');
+        }
+        
+        async function submitComment() {
+            const author = document.getElementById('commentAuthor').value.trim() || '匿名读者';
+            const content = document.getElementById('commentContent').value.trim();
+            
+            if (!content) {
+                alert('请输入评论内容');
+                return;
+            }
+            
+            const comment = {
+                chapterId: currentChapterId,
+                bookId: currentBook.id,
+                author: author,
+                content: content,
+                time: new Date().toISOString()
+            };
+            
+            // GitHub Pages 只能用 localStorage 存储
+            const existing = JSON.parse(localStorage.getItem('comments_' + currentChapterId) || '[]');
+            existing.push(comment);
+            localStorage.setItem('comments_' + currentChapterId, JSON.stringify(existing));
+            
+            document.getElementById('commentContent').value = '';
+            loadComments();
+            alert('评论已保存（本地存储）');
+        }
+
+                // 高亮关键词并滚动到视野
+                // 高亮关键词并滚动到视野
+    function highlightInContent(query) {
+        const body = document.getElementById('markdownBody');
+        if (!body || !query) return;
+        
+        // 分割多关键词
+        const keywords = query.split(/\s+/).filter(k => k.length > 0);
+        let firstHighlight = null;
+        
+        // 遍历所有文本节点，对每个关键词高亮
+        const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null, false);
+        const nodesToReplace = [];
+        let node;
+        
+        while (node = walker.nextNode()) {
+            // 只要包含任意关键词就处理
+            if (keywords.some(k => node.nodeValue.toLowerCase().includes(k.toLowerCase()))) {
+                nodesToReplace.push(node);
+            }
+        }
+        
+        nodesToReplace.forEach(node => {
+            let html = node.nodeValue;
+            // 分别高亮每个关键词
+            keywords.forEach(keyword => {
+                const regex = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+                html = html.replace(regex, match => `<span class="highlight">${match}</span>`);
+            });
+            
+            const wrapper = document.createElement('span');
+            wrapper.innerHTML = html;
+            
+            // 记录第一个高亮用于滚动
+            if (!firstHighlight) {
+                firstHighlight = wrapper.querySelector('.highlight');
+            }
+            
+            node.parentNode.replaceChild(wrapper, node);
+        });
+        
+        // 滚动到第一个高亮
+        if (firstHighlight) {
+            firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    // 导出检索结果为 MD 或 DOCX
+async function exportResults(format) {
+    const query = window.currentSearchQuery || document.getElementById('searchInput').value.trim();
+    const results = window.currentSearchResults || [];
+    const mode = searchMode || 'content';
+    
+    if (!results || results.length === 0) {
+        alert('没有可导出的检索结果，请先执行搜索');
+        return;
+    }
+    
+    const timestamp = new Date().toLocaleString();
+    
+    try {
+        if (format === 'md') {
+            exportToMarkdown(results, query, mode, timestamp);
+        } else if (format === 'docx') {
+            await exportToDocx(results, query, mode, timestamp);
+        }
+    } catch (err) {
+        console.error('导出失败:', err);
+        alert('导出失败: ' + err.message);
+    }
+}
+
+// 导出为 Markdown
+function exportToMarkdown(results, query, mode, timestamp) {
+    let md = `# 古籍文献检索结果\n\n`;
+    md += `**检索词：** ${query}  \n`;
+    md += `**检索模式：** ${mode === 'content' ? '全文检索' : '书名检索'}  \n`;
+    md += `**导出时间：** ${timestamp}  \n`;
+    md += `**结果数量：** ${results.length}\n\n`;
+    md += `---\n\n`;
+    
+    results.forEach((item, index) => {
+        if (mode === 'title') {
+            const book = item.book || item;
+            md += `## ${index + 1}. ${book.title}\n\n`;
+            md += `- **作者：** ${book.author || '佚名'}\n`;
+            md += `- **朝代：** ${book.dynasty || '未知'}\n\n`;
+        } else {
+            md += `## ${index + 1}. ${item.book.title}\n\n`;
+            md += `**${item.book.dynasty} · ${item.book.author}**\n\n`;
+            
+            if (item.matches && item.matches.length > 0) {
+                item.matches.forEach(match => {
+                    md += `**【${match.chapterTitle || '正文'}】** 第${match.line + 1}行\n\n`;
+                    md += `> ${match.text}\n\n`;
+                });
+            }
+        }
+        md += `---\n\n`;
+    });
+    
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    saveAs(blob, `古籍检索结果_${query}_${Date.now()}.md`);
+}
+
+// 导出为 Word (DOCX)
+async function exportToDocx(results, query, mode, timestamp) {
+    if (typeof docx === 'undefined') {
+        alert('Word导出库加载失败，请检查网络');
+        return;
+    }
+    
+    const { Document, Paragraph, TextRun, HeadingLevel, Packer, BorderStyle } = docx;
+    
+    const children = [
+        new Paragraph({
+            text: '古籍文献检索结果',
+            heading: HeadingLevel.TITLE,
+            spacing: { after: 400 }
+        }),
+        new Paragraph({
+            children: [
+                new TextRun({ text: '检索词：', bold: true }),
+                new TextRun({ text: query })
+            ]
+        }),
+        new Paragraph({
+            children: [
+                new TextRun({ text: '检索模式：', bold: true }),
+                new TextRun({ text: mode === 'content' ? '全文检索' : '书名检索' })
+            ]
+        }),
+        new Paragraph({
+            children: [
+                new TextRun({ text: '导出时间：', bold: true }),
+                new TextRun({ text: timestamp })
+            ]
+        }),
+        new Paragraph({
+            children: [
+                new TextRun({ text: '结果数量：', bold: true }),
+                new TextRun({ text: String(results.length) })
+            ],
+            spacing: { after: 400 }
+        }),
+        new Paragraph({
+            border: { bottom: { color: "8b4513", size: 12, style: BorderStyle.SINGLE } },
+            spacing: { after: 200 }
+        })
+    ];
+    
+    results.forEach((result, idx) => {
+        if (mode === 'title') {
+            const book = result.book || result;
+            children.push(new Paragraph({
+                text: `${idx + 1}. ${book.title}`,
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 300, after: 200 }
+            }));
+            children.push(new Paragraph({
+                children: [
+                    new TextRun({ text: '作者：', bold: true }),
+                    new TextRun({ text: book.author || '佚名' })
+                ]
+            }));
+            children.push(new Paragraph({
+                children: [
+                    new TextRun({ text: '朝代：', bold: true }),
+                    new TextRun({ text: book.dynasty || '未知' })
+                ],
+                spacing: { after: 200 }
+            }));
+        } else {
+            children.push(new Paragraph({
+                text: `${idx + 1}. ${result.book.title}`,
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 300, after: 100 }
+            }));
+            children.push(new Paragraph({
+                text: `${result.book.dynasty} · ${result.book.author}`,
+                spacing: { after: 200 },
+                italics: true
+            }));
+            
+            if (result.matches && result.matches.length > 0) {
+                result.matches.forEach(match => {
+                    children.push(new Paragraph({
+                        text: match.chapterTitle || '正文',
+                        heading: HeadingLevel.HEADING_3,
+                        spacing: { before: 200 }
+                    }));
+                    
+                    // 构建带高亮的文本
+                    const keywords = query.split(/\s+/).filter(k => k.length > 0);
+                    const textParts = match.text.split(new RegExp(`(${keywords.join('|')})`, 'gi'));
+                    
+                    children.push(new Paragraph({
+                        spacing: { before: 100, after: 100 },
+                        border: { left: { style: BorderStyle.SINGLE, size: 24, color: "8b4513", space: 10 } },
+                        shading: { fill: "f7f3e9" },
+                        children: textParts.map(part => {
+                            const isKeyword = keywords.some(k => part.toLowerCase() === k.toLowerCase());
+                            return new TextRun({
+                                text: part,
+                                bold: isKeyword,
+                                color: isKeyword ? "8b4513" : "000000",
+                                highlight: isKeyword ? "yellow" : undefined
+                            });
+                        })
+                    }));
+                    
+                    children.push(new Paragraph({
+                        text: `行号：${match.line + 1}`,
+                        spacing: { after: 200 },
+                        size: 18,
+                        color: "888888",
+                        italics: true
+                    }));
+                });
+            }
+        }
+        
+        children.push(new Paragraph({
+            border: { bottom: { color: "d4c4b0", size: 6, style: BorderStyle.SINGLE } },
+            spacing: { after: 200 }
+        }));
+    });
+    
+    const doc = new Document({
+        sections: [{ properties: {}, children }]
+    });
+    
+    const blob = await Packer.toBlob(doc);
+    saveAs(blob, `古籍检索结果_${query}_${Date.now()}.docx`);
+}
+
+    
+    </script>
+</body>
+</html>
